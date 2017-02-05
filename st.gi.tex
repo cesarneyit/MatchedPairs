@@ -1,0 +1,153 @@
+###############################################################
+###############################################################
+coho_isom:=
+function(R,S,A,Hn,n)
+local G,a,b,x,bhomc,B,C,psi,delta,GhomG,SmapR,BasA,Basn,
+      gensHnA, HnAgrp, gensHnAgrp, hn, natn, Kn, Cn,fun,fun2,
+      genshn,imgenshn,hn2HnA,xx,HnA2hn,imgensHnA,RmapSdual,SmapRdual,matRS,
+      matSR, w,i,j,jj, HnAgrp2hn, hn2HnAgrp,p;
+
+#R is a minimal resolution of GF(p) for the p-group G.
+#S is any resolution over Z for the p-group G.
+#A is the algebra constructed from ModPCohomologyRing(R).
+#Hn is H^n(Hom(S,K)) where K is any GOuter group representation of
+#the trivial G-module GF(p)
+#We'll return an  isomorphism HnA2hn where hn is the
+#cohomology *group* H^n(S,K) and HnA is a sub magma of A. 
+
+p:=EvaluateProperty(R,"characteristic");
+
+#########################
+if not IsPrimeInt(p) then 
+Print("The first input resolution must be a minimal resolution of prime characteristic.\n");
+return fail;
+fi;
+#########################
+
+G:=R!.group;
+if not G=S!.group then return fail; fi;
+GhomG:=GroupHomomorphismByFunction(G,G,x->x);
+SmapR:=EquivariantChainMap(S,R,GhomG);
+
+matSR:=NullMat(S!.dimension(n),R!.dimension(n));
+for i in [1..S!.dimension(n)] do
+w:=SmapR!.mapping([[i,1]],n);
+w:=List(w,x->x[1]);
+for j in w do
+jj:=AbsInt(j);
+matSR[i][jj]:=matSR[i][jj]+SignInt(j) mod p;
+od;
+od;
+
+matSR:=TransposedMat(matSR) mod p;
+
+###################################
+SmapRdual:=function(w,n)
+local v,x,j,a;
+v:=[];
+
+for x in w do
+for j in [1..S!.dimension(n)] do
+a:=SignInt(x[1])*matSR[AbsInt(x[1])][j];
+if not a=0 then 
+v:=AddFreeWords(v,MultiplyWord(a,[[j,1]]),p); fi;
+od;
+od;
+
+return AlgebraicReduction(v,p);
+end;
+###################################
+
+
+BasA:=CanonicalBasis(A);
+Basn:=Filtered([1..Length(BasA)],i->A!.degree(BasA[i])=n);
+gensHnA:=Filtered(BasA,i->A!.degree(i)=n);
+
+hn:=Hn!.ActedGroup;
+natn:=Hn!.nat; natn:=natn!.Mapping;
+Kn:=Source(natn);
+Cn:=Kn!.ParentAttr;
+
+genshn:=Pcgs(hn);
+
+xx:=GeneratorsOfGroup(Source(Embedding(Cn,1)))[1];
+###################
+fun:=function(w)
+local v,y;
+v:=One(Cn);
+for y in w do
+v:=v*Image(Embedding(Cn,AbsInt(y[1])),xx)^SignInt(y[1]);
+od;
+return v;
+end;
+###################
+
+imgensHnA:=List([1..R!.dimension(n)],i->SmapRdual([[i,1]],n));
+imgensHnA:=List(imgensHnA,x->fun(x));
+imgensHnA:=List(imgensHnA,x->Image(natn,x));
+
+##################
+HnA2hn:=function(w)
+local c, v, i;
+c:=Coefficients(BasA,w);
+c:=c{Basn};
+v:=One(hn);
+for i in [1..Length(c)] do
+#if not IsZero(c[i]) then v:=v*imgensHnA[i]; fi;
+v:=v*imgensHnA[i]^IntFFE(c[i]);
+od;
+return v;
+end;
+##################
+
+
+
+return HnA2hn;
+end;
+###############################################################
+###############################################################
+
+
+###############################################################
+###############################################################
+cesar:=function(G)
+local R,S,A,h,x1,b1,B1,CB1,H4,H42,x2,b2,B2,CB2,psi,b1homb2,hh,id,H44,k;
+
+R:=ResolutionPrimePowerGroup(G,5);;
+S:=ResolutionFiniteGroup(G,5);;
+A:=ModPCohomologyRing(R);;
+b1:=CyclicGroup(IsPermGroup, 2);;
+x1:=MinimalGeneratingSet(b1)[1];
+B1:=TrivialGModuleAsGOuterGroup(G,b1);
+CB1:=HomToGModule(S,B1);
+H4:=CohomologyModule(CB1,4);
+h:=coho_isom(R,S,A,H4,4);
+
+b2:=CyclicGroup(IsPermGroup, 2*Order(G));;
+x2:=MinimalGeneratingSet(b2)[1];
+B2:=TrivialGModuleAsGOuterGroup(G,b2);
+CB2:=HomToGModule(S,B2);
+H42:=CohomologyModule(CB2,4);
+h:=coho_isom(R,S,A,H4,4);
+b1homb2:=GroupHomomorphismByImages(b1,b2,[x1],[x2^(Order(b2)/2)]);
+
+psi:=GOuterGroupHomomorphism();
+psi!.Source:=B1;
+psi!.Target:=B2;
+psi!.Mapping:=b1homb2;
+hh:=CohomologyHomomorphism(psi,4);
+hh:=hh!.Mapping;
+H44:=Source(hh);
+H4:=H4!.ActedGroup;
+id:=GroupHomomorphismByImages(H4,H44,GeneratorsOfGroup(H4),GeneratorsOfGroup(H44));
+
+k:=function(w);
+return Image(hh,(Image(id,h(w))));
+end;
+
+
+return [A,k];
+end;
+###############################################################
+###############################################################
+
